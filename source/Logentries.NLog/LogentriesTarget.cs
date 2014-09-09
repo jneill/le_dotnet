@@ -8,7 +8,7 @@ using NLog.Config;
 using NLog.Layouts;
 using NLog.Targets;
 
-using LogentriesCore.Net;
+using Logentries.Core;
 
 namespace NLog.Targets
 {

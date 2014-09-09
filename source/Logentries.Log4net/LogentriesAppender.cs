@@ -5,7 +5,7 @@ using System.Text;
 using log4net.Appender;
 using log4net.Core;
 
-using LogentriesCore.Net;
+using Logentries.Core;
 
 namespace log4net.Appender
 {

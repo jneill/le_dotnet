@@ -9,7 +9,7 @@ using System.Threading;
 using System.Text.RegularExpressions;
 using Microsoft.WindowsAzure;
 
-namespace LogentriesCore.Net
+namespace Logentries.Core
 {
     public class AsyncLogger
     {

@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
-namespace LogentriesCore.Net
+namespace Logentries.Core
 {
     class LeClient
     {

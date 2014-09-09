@@ -8,8 +8,8 @@
     <ProjectGuid>{CF8A9166-3B7D-4D4C-82CB-6C98C68DB110}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>LogentriesLog4net</RootNamespace>
-    <AssemblyName>LogentriesLog4net</AssemblyName>
+    <RootNamespace>Logentries.Log4net</RootNamespace>
+    <AssemblyName>Logentries.Log4net</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -36,7 +36,7 @@
   <ItemGroup>
     <Reference Include="log4net, Version=1.2.13.0, Culture=neutral, PublicKeyToken=669e0ddf0bb1aa2a, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
+      <HintPath>..\..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -51,7 +51,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\LogentriesCore\LogentriesCore.csproj">
+    <ProjectReference Include="..\Logentries.Core\Logentries.Core.csproj">
       <Project>{90D6E9FC-7B88-4E1B-B018-8FA742274558}</Project>
       <Name>LogentriesCore</Name>
     </ProjectReference>
