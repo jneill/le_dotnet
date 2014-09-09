@@ -1,142 +1,72 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-using NLog.Common;
-using NLog.Config;
-using NLog.Layouts;
-using NLog.Targets;
-
-using Logentries.Core;
-
+﻿// ReSharper disable once CheckNamespace
 namespace NLog.Targets
 {
+    using Logentries.Core;
+
     [Target("Logentries")]
     public sealed class LogentriesTarget : TargetWithLayout
     {
-        private AsyncLogger logentriesAsync;
+        private LeLogger logger;
 
-        public LogentriesTarget()
-        {
-            logentriesAsync = new AsyncLogger();
-        }
+        public bool Debug { get; set; }
 
-        
-        /** Debug flag. */
-        public bool Debug 
-        {
-            get { return logentriesAsync.getDebug(); }
-            set { logentriesAsync.setDebug(value); } 
-        }
+        public bool IsUsingDataHub { get; set; }
 
-        /** Is using DataHub parameter flag. - ste to true if it is needed to send messages to DataHub instance. */
-        public bool IsUsingDataHub
-        {
-            get { return logentriesAsync.getIsUsingDataHab(); }
-            set { logentriesAsync.setIsUsingDataHub(value); }
-        }
+        public string DataHubAddress { get; set; }
 
-        /** DataHub server address */
-        public String DataHubAddr
-        {
-            get { return logentriesAsync.getDataHubAddr(); }
-            set { logentriesAsync.setDataHubAddr(value); }
-        }
+        public int DataHubPort { get; set; }
 
-        /** DataHub server port */
-        public int DataHubPort
-        {
-            get { return logentriesAsync.getDataHubPort(); }
-            set { logentriesAsync.setDataHubPort(value); }
-        }
+        public string Token { get; set; }
 
-        /** Option to set Token programmatically or in Appender Definition */
-        public string Token
-        {
-            get { return logentriesAsync.getToken(); }
-            set { logentriesAsync.setToken(value); }
-        }
+        public bool Ssl { get; set; }
 
-        /** HTTP PUT Flag */
-        public bool HttpPut
-        {
-            get { return logentriesAsync.getUseHttpPut(); }
-            set { logentriesAsync.setUseHttpPut(value); }
-        }
+        public bool LogHostname { get; set; }
 
-        /** SSL/TLS parameter flag */
-        public bool Ssl
-        {
-            get { return logentriesAsync.getUseSsl(); }
-            set { logentriesAsync.setUseSsl(value); }
-        }
+        public string HostName { get; set; }
 
-        /** ACCOUNT_KEY parameter for HTTP PUT logging */
-        public String Key
-        {
-            get { return logentriesAsync.getAccountKey(); }
-            set { logentriesAsync.setAccountKey(value); }
-        }
-
-        /** LOCATION parameter for HTTP PUT logging */
-        public String Location
-        {
-            get { return logentriesAsync.getLocation(); }
-            set { logentriesAsync.setLocation(value); }
-        }
-
-        /* LogHostname - switch that defines whether add host name to the log message */
-        public bool LogHostname
-        {
-            get { return logentriesAsync.getUseHostName(); }
-            set { logentriesAsync.setUseHostName(value); }
-        }
-
-        /* HostName - user-defined host name. If empty the library will try to obtain it automatically */
-        public String HostName
-        {
-            get { return logentriesAsync.getHostName(); }
-            set { logentriesAsync.setHostName(value); }
-        }
-
-        /* User-defined log message ID */
-        public String LogID
-        {
-            get { return logentriesAsync.getLogID(); }
-            set { logentriesAsync.setLogID(value); }
-        }
+        public string LogId { get; set; }
 
         public bool KeepConnection { get; set; }
 
         protected override void Write(LogEventInfo logEvent)
         {
-            //Render message content
-            String renderedEvent = this.Layout.Render(logEvent);
-
-            try
+            if (logger == null)
             {
-                //NLog can pass null references of Exception
-                if (logEvent.Exception != null)
-                {
-                    String excep = logEvent.Exception.ToString();
-                    if (excep.Length > 0)
-                    {
-                        renderedEvent += ", ";
-                        renderedEvent += excep;
-                    }
-                }
+                logger = CreateLogger();
+                logger.Run();
             }
-            catch { }
 
-            logentriesAsync.AddLine(renderedEvent);
+            var message = ToMessage(logEvent);
+            logger.Send(message);
         }
 
         protected override void CloseTarget()
         {
             base.CloseTarget();
 
-            logentriesAsync.interruptWorker();
+            if (logger != null)
+            {
+                logger.Stop();
+            }
+        }
+
+        private LeLogger CreateLogger()
+        {
+            var formatter = new LeMessageFormatter(
+                logId: LogId,
+                hostname: LogHostname ? LeConfiguration.GetValidHostName(HostName) : null);
+
+            return IsUsingDataHub
+                ? LeLogger.CreateDataHubLogger(DataHubAddress, DataHubPort, formatter)
+                : LeLogger.CreateTokenBasedLogger(LeConfiguration.GetValidToken(Token), Ssl, formatter);
+        }
+
+        private string ToMessage(LogEventInfo logEvent)
+        {
+            var renderedEvent = Layout.Render(logEvent);
+            return logEvent.Exception != null
+                ? renderedEvent + ", " + logEvent.Exception
+                : renderedEvent;
         }
     }
 }

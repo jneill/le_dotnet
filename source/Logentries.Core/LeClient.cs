@@ -1,140 +1,74 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Net.Security;
-using System.Net.Sockets;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-
-namespace Logentries.Core
+﻿namespace Logentries.Core
 {
-    class LeClient
+    using System;
+    using System.Security.Cryptography.X509Certificates;
+    using System.Text;
+    using System.Threading;
+    using System.Threading.Tasks;
+
+    public class LeClient : IDisposable
     {
-        // Logentries API server address. 
-        protected const String LeApiUrl = "api.logentries.com";
+        private const string LineSeparator = "\u2028";
 
-        // Port number for token logging on Logentries API server. 
-        protected const int LeApiTokenPort = 10000;
+        private static readonly string[] NewlineSequences = { "\r\n", "\n" };
 
-        // Port number for TLS encrypted token logging on Logentries API server 
-        protected const int LeApiTokenTlsPort = 20000;
+        private static readonly Encoding Encoding = Encoding.UTF8;
 
-        // Port number for HTTP PUT logging on Logentries API server. 
-        protected const int LeApiHttpPort = 80;
+        private readonly string tokenString;
 
-        // Port number for SSL HTTP PUT logging on Logentries API server. 
-        protected const int LeApiHttpsPort = 443;
+        private readonly LeMessageFormatter formatter;
 
-        // Logentries API server certificate. 
-        protected static readonly X509Certificate2 LeApiServerCertificate =
-            new X509Certificate2(Encoding.UTF8.GetBytes(
-@"-----BEGIN CERTIFICATE-----
-MIIFSjCCBDKgAwIBAgIDCQpNMA0GCSqGSIb3DQEBBQUAMGExCzAJBgNVBAYTAlVT
-MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMR0wGwYDVQQLExREb21haW4gVmFsaWRh
-dGVkIFNTTDEbMBkGA1UEAxMSR2VvVHJ1c3QgRFYgU1NMIENBMB4XDTE0MDQxNTEz
-NTcxNVoXDTE2MDkxMzA0MTMzMFowgcExKTAnBgNVBAUTIEhpL1RHbXlmUEpJYTFy
-b0NQdlJ1U1NNRVdLOFp0NUtmMRMwEQYDVQQLEwpHVDAzOTM4NjcwMTEwLwYDVQQL
-EyhTZWUgd3d3Lmdlb3RydXN0LmNvbS9yZXNvdXJjZXMvY3BzIChjKTEyMS8wLQYD
-VQQLEyZEb21haW4gQ29udHJvbCBWYWxpZGF0ZWQgLSBRdWlja1NTTChSKTEbMBkG
-A1UEAxMSYXBpLmxvZ2VudHJpZXMuY29tMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A
-MIIBCgKCAQEAwGsgjVb/pn7Go1jqNQVFsN+VEMRFpu7bJ5i+Lv/gY9zXBDGULr3d
-j9/hB/pa49nLUpy9GsaFru2AjNoveoVoe5ng2QhZRlUn77hxkoZsaiD+rrH/D/Yp
-LP3b/pNQg+nNTC81uwbhlxjIoeMSaPGjr1SFjZ1StCprZKFRu3IV+2/wZ+STUz/L
-aA3r6J86DRptasbzYMkDyWlUzN3nhYUcPUNrd4jSk+soSDEuDpHMahgRdQBo6Dht
-EKCSY+vB5ZIgEydI7mra8ygRjXotvc0zeb8Jvo8ZhyLDwvxjgo9F6Li3h/tfAjRR
-4ngV7yg9o8MgXN852GMHpUxzqhygLeyqSQIDAQABo4IBqDCCAaQwHwYDVR0jBBgw
-FoAUjPTZkwpHvACgSs5LdW6gtrCyfvwwDgYDVR0PAQH/BAQDAgWgMB0GA1UdJQQW
-MBQGCCsGAQUFBwMBBggrBgEFBQcDAjAdBgNVHREEFjAUghJhcGkubG9nZW50cmll
-cy5jb20wQQYDVR0fBDowODA2oDSgMoYwaHR0cDovL2d0c3NsZHYtY3JsLmdlb3Ry
-dXN0LmNvbS9jcmxzL2d0c3NsZHYuY3JsMB0GA1UdDgQWBBRowYR/aaGeiRRQxbaV
-1PI8hS4m9jAMBgNVHRMBAf8EAjAAMHUGCCsGAQUFBwEBBGkwZzAsBggrBgEFBQcw
-AYYgaHR0cDovL2d0c3NsZHYtb2NzcC5nZW90cnVzdC5jb20wNwYIKwYBBQUHMAKG
-K2h0dHA6Ly9ndHNzbGR2LWFpYS5nZW90cnVzdC5jb20vZ3Rzc2xkdi5jcnQwTAYD
-VR0gBEUwQzBBBgpghkgBhvhFAQc2MDMwMQYIKwYBBQUHAgEWJWh0dHA6Ly93d3cu
-Z2VvdHJ1c3QuY29tL3Jlc291cmNlcy9jcHMwDQYJKoZIhvcNAQEFBQADggEBAAzx
-g9JKztRmpItki8XQoGHEbopDIDMmn4Q7s9k7L9nT5gn5XCXdIHnsSe8+/2N7tW4E
-iHEEWC5G6Q16FdXBwKjW2LrBKaP7FCRcqXJSI+cfiuk0uywkGBTXpqBVClQRzypd
-9vZONyFFlLGUwUC1DFVxe7T77Dv+pOPuJ7qSfcVUnVtzpLMMWJsDG6NHpy0JhsS9
-wVYQgpYWRRZ7bJyfRCJxzIdYF3qy/P9NWyZSlDUuv11s1GSFO2pNd34p59GacVAL
-BJE6y5eOPTSbtkmBW/ukaVYdI5NLXNer3IaK3fetV3LvYGOaX8hR45FI1pvyKYvf
-S5ol3bQmY1mv78XKkOk=
------END CERTIFICATE-----"));
+        private readonly TcpConnection connection;
 
-        // Creates LeClient instance. If do not define useServerUrl and/or useOverrideProt during call
-        // LeClient will be configured to work with api.logentries.com server; otherwise - with
-        // defined server on defined port.
-        public LeClient(bool useHttpPut, bool useSsl, bool useDataHub, String serverAddr, int port)
+        public LeClient(
+            string address,
+            int port,
+            X509Certificate2 sslCertificate = null,
+            Guid? token = null,
+            LeMessageFormatter formatter = null)
+            : this(new TcpConnection(address, port, sslCertificate), token, formatter)
         {
-            
-            // Override port number and server address to send logs to DataHub instance.
-            if (useDataHub)
-            {
-                m_UseSsl = false; // DataHub does not support receiving log messages over SSL for now.
-                m_TcpPort = port;
-                m_ServerAddr = serverAddr;
-            }
-            else
-            {
-                m_UseSsl = useSsl;
-
-                if (!m_UseSsl)
-                    m_TcpPort = useHttpPut ? LeApiHttpPort : LeApiTokenPort;
-                else
-                    m_TcpPort = useHttpPut ? LeApiHttpsPort : LeApiTokenTlsPort;
-            }            
         }
 
-        private bool m_UseSsl = false;
-        private int m_TcpPort;
-        private TcpClient m_Client = null;
-        private Stream m_Stream = null;
-        private SslStream m_SslStream = null;
-        private String m_ServerAddr = LeApiUrl; // By default m_ServerAddr points to api.logentries.com if useDataHub is not set to true.
-
-        private Stream ActiveStream
+        public LeClient(
+            TcpConnection connection,
+            Guid? token = null,
+            LeMessageFormatter formatter = null)
         {
-            get
+            this.connection = connection;
+            this.formatter = formatter ?? new LeMessageFormatter();
+            this.tokenString = token != null ? token.ToString() : string.Empty;
+        }
+
+        public async Task SendAsync(string message, CancellationToken cancellationToken)
+        {
+            message = formatter.Format(message);
+            var data = Encoding.GetBytes(tokenString + EncodeNewlines(message) + "\n");
+            await connection.SendAsync(data, cancellationToken);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
             {
-                return m_UseSsl ? m_SslStream : m_Stream;
+                connection.Dispose();
             }
         }
 
-        public void Connect()
+        private string EncodeNewlines(string message)
         {
-            m_Client = new TcpClient(m_ServerAddr, m_TcpPort);
-            m_Client.NoDelay = true;
-
-            m_Stream = m_Client.GetStream();
-
-            if (m_UseSsl)
+            foreach (string newline in NewlineSequences)
             {
-                m_SslStream = new SslStream(m_Stream, false, (sender, cert, chain, errors) => cert.GetCertHashString() == LeApiServerCertificate.GetCertHashString());
-                m_SslStream.AuthenticateAsClient(m_ServerAddr);
+                message = message.Replace(newline, LineSeparator);
             }
-        }
 
-        public void Write(byte[] buffer, int offset, int count)
-        {
-            ActiveStream.Write(buffer, offset, count);
-        }
-
-        public void Flush()
-        {
-            ActiveStream.Flush();
-        }
-
-        public void Close()
-        {
-            if (m_Client != null)
-            {
-                try
-                {
-                    m_Client.Close();
-                }
-                catch
-                {
-                }
-            }
+            return message;
         }
     }
 }
